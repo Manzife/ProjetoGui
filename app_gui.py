@@ -43,7 +43,7 @@ st.write("### Insumos cadastrados")
 for i, row in st.session_state.insumos.iterrows():
     col1, col2 = st.columns([10, 1])
     with col1:
-        st.write(row.to_dict())
+        st.markdown(f"**{row['Nome']}** — {row['Unidade']}, R$ {row['Preço Unitário']:.2f}")
     with col2:
         if st.button("❌", key=f"del_insumo_{i}"):
             st.session_state.insumos.drop(index=i, inplace=True)
@@ -65,7 +65,7 @@ st.write("### Produtos cadastrados")
 for i, row in st.session_state.produtos.iterrows():
     col1, col2 = st.columns([10, 1])
     with col1:
-        st.write(row.to_dict())
+        st.markdown(f"**{row['Produto']}** → {row['Quantidade']}x {row['Insumo']}")
     with col2:
         if st.button("❌", key=f"del_prod_{i}"):
             st.session_state.produtos.drop(index=i, inplace=True)
