@@ -43,7 +43,7 @@ st.write("### Insumos cadastrados")
 for i, row in st.session_state.insumos.iterrows():
     col1, col2 = st.columns([10, 1])
     with col1:
-        st.markdown(f"**{row['Nome']}** — {row['Unidade']}, R$ {row['Preço Unitário']:.2f}")
+        st.markdown(f"**{row['Nome'].strip()}** — {row['Unidade']}, R$ {row['Preço Unitário']:.2f}")
     with col2:
         if st.button("❌", key=f"del_insumo_{i}"):
             st.session_state.insumos.drop(index=i, inplace=True)
