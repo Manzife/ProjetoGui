@@ -3,9 +3,22 @@ import pandas as pd
 import os
 from fpdf import FPDF
 from datetime import datetime
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Orçamento Marcenaria", layout="centered")
 st.title("🌳 Sistema de Orçamento para Marcenaria")
+
+# CSS para mostrar botão de exclusão apenas ao passar o mouse
+st.markdown("""
+    <style>
+    .delete-btn {
+        visibility: hidden;
+    }
+    .stDataFrame tbody tr:hover .delete-btn {
+        visibility: visible;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Inicializa os dados se não existirem
 if "insumos" not in st.session_state:
@@ -25,7 +38,17 @@ with st.form("form_insumo"):
         st.session_state.insumos.loc[len(st.session_state.insumos)] = [nome_insumo, unidade, preco]
         st.success("Insumo adicionado!")
 
-st.dataframe(st.session_state.insumos)
+# Mostrar tabela com botão de exclusão
+st.write("### Insumos cadastrados")
+for i, row in st.session_state.insumos.iterrows():
+    col1, col2 = st.columns([10, 1])
+    with col1:
+        st.write(row.to_dict())
+    with col2:
+        if st.button("❌", key=f"del_insumo_{i}"):
+            st.session_state.insumos.drop(index=i, inplace=True)
+            st.session_state.insumos.reset_index(drop=True, inplace=True)
+            st.experimental_rerun()
 
 # 2. Cadastro de Produtos
 st.header("2. Cadastro de Produtos")
@@ -38,7 +61,16 @@ with st.form("form_produto"):
         st.session_state.produtos.loc[len(st.session_state.produtos)] = [nome_produto, insumo_sel, qtd_insumo]
         st.success("Componente adicionado ao produto!")
 
-st.dataframe(st.session_state.produtos)
+st.write("### Produtos cadastrados")
+for i, row in st.session_state.produtos.iterrows():
+    col1, col2 = st.columns([10, 1])
+    with col1:
+        st.write(row.to_dict())
+    with col2:
+        if st.button("❌", key=f"del_prod_{i}"):
+            st.session_state.produtos.drop(index=i, inplace=True)
+            st.session_state.produtos.reset_index(drop=True, inplace=True)
+            st.experimental_rerun()
 
 # 3. Montagem de Orçamento
 st.header("3. Montar Orçamento")
