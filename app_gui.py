@@ -41,14 +41,31 @@ with st.form("form_insumo"):
 # Mostrar tabela com botão de exclusão
 st.write("### Insumos cadastrados")
 for i, row in st.session_state.insumos.iterrows():
-    col1, col2 = st.columns([10, 1])
+    col1, col2, col3 = st.columns([8, 1, 1])
     with col1:
         st.markdown(f"**{row['Nome'].strip()}** — {row['Unidade']}, R$ {row['Preço Unitário']:.2f}")
     with col2:
+        if st.button("✏️", key=f"edit_insumo_{i}"):
+            st.session_state[f"edit_index"] = i
+    with col3:
         if st.button("❌", key=f"del_insumo_{i}"):
             st.session_state.insumos.drop(index=i, inplace=True)
             st.session_state.insumos.reset_index(drop=True, inplace=True)
             st.experimental_rerun()
+
+# Campo de edição de preço
+if "edit_index" in st.session_state:
+    idx = st.session_state["edit_index"]
+    row = st.session_state.insumos.loc[idx]
+    st.info(f"Editando: {row['Nome'].strip()}")
+    novo_preco = st.number_input("Novo Preço Unitário", value=float(row["Preço Unitário"]), min_value=0.0, step=0.5, key="novo_preco_input")
+    if st.button("Salvar Preço Atualizado"):
+        st.session_state.insumos.at[idx, "Preço Unitário"] = novo_preco
+        del st.session_state["edit_index"]
+        st.success("Preço atualizado com sucesso!")
+        st.experimental_rerun()
+    if st.button("Cancelar Edição"):
+        del st.session_state["edit_index"]
 
 # 2. Cadastro de Produtos
 st.header("2. Cadastro de Produtos")
