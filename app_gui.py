@@ -79,7 +79,8 @@ with tab2:
     st.header("Cadastro de Produtos")
     with st.form("form_produto"):
         nome_produto = st.text_input("Nome do Produto")
-        insumo_sel = st.selectbox("Escolher Insumo", st.session_state.insumos["Nome"])
+        st.session_state.insumos["InsumoCompleto"] = st.session_state.insumos["Nome"] + " - " + st.session_state.insumos["Cor"]
+        insumo_sel = st.selectbox("Escolher Insumo (com Cor)", st.session_state.insumos["InsumoCompleto"])
         cor_opcoes = st.session_state.insumos["Cor"].unique()
         cor_sel = st.selectbox("Selecionar Cor", cor_opcoes)  # <- Cor obrigatória
         qtd_insumo = st.number_input("Quantidade do Insumo", min_value=0.1, step=0.1)
@@ -88,7 +89,8 @@ with tab2:
             if not cor_sel:
                 st.error("Por favor, selecione uma cor.")
             else:
-                st.session_state.produtos.loc[len(st.session_state.produtos)] = [nome_produto, insumo_sel, qtd_insumo, cor_sel]
+                nome_base, cor_base = insumo_sel.split(" - ")
+                st.session_state.produtos.loc[len(st.session_state.produtos)] = [nome_produto, nome_base, qtd_insumo, cor_base]
                 st.success("Componente adicionado ao produto!")
 
     st.write("### Produtos cadastrados")
