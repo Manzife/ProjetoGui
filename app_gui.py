@@ -36,7 +36,11 @@ with tab1:
     st.header("Cadastro de Insumos")
     with st.form("form_insumo"):
         nome_insumo = st.text_input("Nome do Insumo")
-        unidade = st.text_input("Unidade de Medida")
+        unidades_padrao = ["M²", "Litro (L)", "kg", "Unidade"]
+        unidade = st.selectbox("Unidade de Medida", options=unidades_padrao + ["Outro..."], index=0)
+        
+        if unidade == "Outro...":
+            unidade = st.text_input("Informe a nova unidade:")
         preco = st.number_input("Preço Unitário", min_value=0.0, step=0.1)
         cor = st.text_input("Cor", value="Preto")  # <- Novo campo
         submitted = st.form_submit_button("Adicionar Insumo")
