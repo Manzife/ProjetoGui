@@ -22,8 +22,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Inicializa os dados
-if "insumos" not in st.session_state:
+if "insumos" not in st.session_state or st.session_state.insumos.empty:
     st.session_state.insumos = pd.DataFrame(columns=["Nome", "Unidade", "Preço Unitário", "Cor"])
+else:
+    # Garante que a ordem das colunas está correta
+    st.session_state.insumos = st.session_state.insumos.reindex(columns=["Nome", "Unidade", "Preço Unitário", "Cor"])
 
 if "produtos" not in st.session_state:
     st.session_state.produtos = pd.DataFrame(columns=["Produto", "Insumo", "Quantidade", "Cor"])
