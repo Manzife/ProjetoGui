@@ -86,48 +86,79 @@ with tab1:
 with tab2:
     st.header("Cadastro de Produtos")
 
-    st.subheader("🨚 Armário Padrão (automático)")
-    altura = st.slider("Altura (cm)", 30, 250, 180)
-    largura = st.slider("Largura (cm)", 30, 250, 100)
-    profundidade = st.slider("Profundidade (cm)", 30, 100, 60)
-    h, l, p = altura / 100, largura / 100, profundidade / 100
-    area_total = (l * p) + 2 * (p * h) + 2 * (l * h)
-    st.write(f"🔨 Área total estimada de chapa de madeira: **{area_total:.2f} m²**")
+    st.subheader("🪚 Armário Padrão (sem tampa)")
 
-    fig = go.Figure(data=[
-        go.Mesh3d(
-            x=[0, l, l, 0, 0, l, l, 0],
-            y=[0, 0, p, p, 0, 0, p, p],
-            z=[0, 0, 0, 0, h, h, h, h],
-            color='lightblue',
-            opacity=0.4,
-            i=[0, 0, 0, 4, 4, 4, 1, 1, 5, 2, 2, 6],
-            j=[1, 2, 3, 5, 6, 7, 5, 6, 6, 6, 3, 7],
-            k=[2, 3, 0, 6, 7, 4, 6, 7, 2, 3, 0, 4],
-            flatshading=True
-        )
-    ])
-    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), scene=dict(
-        xaxis_title="Largura (m)",
-        yaxis_title="Profundidade (m)",
-        zaxis_title="Altura (m)",
-    ))
-    st.plotly_chart(fig, use_container_width=True)
-
-    cor_armario = st.selectbox("Cor da Chapa", st.session_state.insumos["Cor"].unique())
-
-    if st.button("Adicionar Armário com essas dimensões"):
-        existe_insumo = st.session_state.insumos[
-            (st.session_state.insumos["Nome"] == "Chapa de Madeira") &
-            (st.session_state.insumos["Cor"] == cor_armario)
+        # Dimensões do armário (em metros)
+        altura = st.slider("Altura (cm)", 30, 250, 180) / 100
+        largura = st.slider("Largura (cm)", 30, 250, 100) / 100
+        profundidade = st.slider("Profundidade (cm)", 30, 100, 60) / 100
+        
+        # Opções de cor para cada face
+        cores_disponiveis = {
+            "Branco": "#F0F0F0",
+            "Preto": "#111111",
+            "Cinza": "#888888",
+            "Madeira": "#a0522d"
+        }
+        
+        cor_frente = st.selectbox("Cor da Frente", list(cores_disponiveis.keys()), index=3)
+        cor_tras = st.selectbox("Cor de Trás", list(cores_disponiveis.keys()), index=3)
+        cor_esq = st.selectbox("Cor da Lateral Esquerda", list(cores_disponiveis.keys()), index=3)
+        cor_dir = st.selectbox("Cor da Lateral Direita", list(cores_disponiveis.keys()), index=3)
+        cor_fundo = st.selectbox("Cor do Fundo", list(cores_disponiveis.keys()), index=3)
+        
+        # Criar cada face como um cubo fino
+        def face_mesh(x_range, y_range, z_range, color_hex):
+            x = [x_range[0], x_range[1], x_range[1], x_range[0], x_range[0], x_range[1], x_range[1], x_range[0]]
+            y = [y_range[0], y_range[0], y_range[1], y_range[1], y_range[0], y_range[0], y_range[1], y_range[1]]
+            z = [z_range[0], z_range[0], z_range[0], z_range[0], z_range[1], z_range[1], z_range[1], z_range[1]]
+        
+            return go.Mesh3d(
+                x=x, y=y, z=z,
+                color=color_hex,
+                opacity=1.0,
+                alphahull=0
+            )
+        
+        faces = [
+            face_mesh([0, largura], [0, 0.02], [0, altura], cores_disponiveis[cor_esq]),       # Lateral esquerda
+            face_mesh([largura-0.02, largura], [0, profundidade], [0, altura], cores_disponiveis[cor_dir]),  # Lateral direita
+            face_mesh([0, largura], [0, profundidade], [0, 0.02], cores_disponiveis[cor_fundo]), # Fundo
+            face_mesh([0, largura], [profundidade-0.02, profundidade], [0, altura], cores_disponiveis[cor_tras]), # Trás
+            face_mesh([0, largura], [0, 0.02], [0, altura], cores_disponiveis[cor_frente])  # Frente sobre lateral esq (simulação frontal)
         ]
-        if not existe_insumo.empty:
-            st.session_state.produtos.loc[len(st.session_state.produtos)] = [
-                "Armário", "Chapa de Madeira", area_total, cor_armario
+        
+        fig = go.Figure(data=faces)
+        fig.update_layout(
+            scene=dict(
+                xaxis_title="Largura (m)",
+                yaxis_title="Profundidade (m)",
+                zaxis_title="Altura (m)"
+            ),
+            margin=dict(l=0, r=0, t=0, b=0)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Área total estimada (para orçamento)
+        area_total = 2 * (altura * profundidade) + 2 * (altura * largura) + (largura * profundidade)
+        st.write(f"🔨 Área total estimada de chapa de madeira: **{area_total:.2f} m²**")
+        
+        # Cor predominante opcional (ex: frontal) ou multi-insumo
+        cor_predominante = cor_frente  # ou permitir outra lógica
+        
+        if st.button("Adicionar Armário com essas características"):
+            existe_insumo = st.session_state.insumos[
+                (st.session_state.insumos["Nome"] == "Chapa de Madeira") &
+                (st.session_state.insumos["Cor"] == cor_predominante)
             ]
-            st.success("Armário adicionado com sucesso ao orçamento!")
-        else:
-            st.warning("Não foi encontrado o insumo 'Chapa de Madeira' com essa cor. Cadastre antes de adicionar.")
+            if not existe_insumo.empty:
+                st.session_state.produtos.loc[len(st.session_state.produtos)] = [
+                    "Armário", "Chapa de Madeira", area_total, cor_predominante
+                ]
+                st.success("Armário adicionado com sucesso ao orçamento!")
+            else:
+                st.warning("Não foi encontrado o insumo 'Chapa de Madeira' com essa cor. Cadastre antes de adicionar.")
+
 
     st.subheader("Cadastrar Produto Manualmente")
     st.session_state.insumos["InsumoCompleto"] = st.session_state.insumos["Nome"] + " - " + st.session_state.insumos["Cor"]
