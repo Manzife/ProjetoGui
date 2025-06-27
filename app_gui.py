@@ -22,10 +22,11 @@ st.markdown("""
 
 # Inicializa os dados
 if "insumos" not in st.session_state:
-    st.session_state.insumos = pd.DataFrame(columns=["Nome", "Unidade", "Preço Unitário"])
+    st.session_state.insumos = pd.DataFrame(columns=["Nome", "Unidade", "Preço Unitário", "Cor"])
 
 if "produtos" not in st.session_state:
-    st.session_state.produtos = pd.DataFrame(columns=["Produto", "Insumo", "Quantidade"])
+    st.session_state.produtos = pd.DataFrame(columns=["Produto", "Insumo", "Quantidade", "Cor"])
+
 
 # Tabs
 tab1, tab2, tab3 = st.tabs(["📦 Cadastro de Insumos", "🛠️ Cadastro de Produtos", "💰 Montagem de Orçamento"])
@@ -37,16 +38,17 @@ with tab1:
         nome_insumo = st.text_input("Nome do Insumo")
         unidade = st.text_input("Unidade de Medida")
         preco = st.number_input("Preço Unitário", min_value=0.0, step=0.1)
+        cor = st.text_input("Cor", value="Preto")  # <- Novo campo
         submitted = st.form_submit_button("Adicionar Insumo")
         if submitted:
-            st.session_state.insumos.loc[len(st.session_state.insumos)] = [nome_insumo, unidade, preco]
+            st.session_state.insumos.loc[len(st.session_state.insumos)] = [nome_insumo, unidade, preco, cor]
             st.success("Insumo adicionado!")
 
     st.write("### Insumos cadastrados")
     for i, row in st.session_state.insumos.iterrows():
         col1, col2, col3 = st.columns([8, 1, 1])
         with col1:
-            st.markdown(f"**{row['Nome'].strip()}** — {row['Unidade']}, R$ {row['Preço Unitário']:.2f}")
+            st.markdown(f"**{row['Nome'].strip()}** — {row['Unidade']}, R$ {row['Preço Unitário']:.2f}, Cor: {row['Cor']}")
         with col2:
             if st.button("✏️", key=f"edit_insumo_{i}"):
                 st.session_state["edit_index"] = i
@@ -61,13 +63,16 @@ with tab1:
         row = st.session_state.insumos.loc[idx]
         st.info(f"Editando: {row['Nome'].strip()}")
         novo_preco = st.number_input("Novo Preço Unitário", value=float(row["Preço Unitário"]), min_value=0.0, step=0.5, key="novo_preco_input")
+        nova_cor = st.text_input("Nova Cor", value=row["Cor"], key="nova_cor_input")
         if st.button("Salvar Preço Atualizado"):
             st.session_state.insumos.at[idx, "Preço Unitário"] = novo_preco
+            st.session_state.insumos.at[idx, "Cor"] = nova_cor
             del st.session_state["edit_index"]
-            st.success("Preço atualizado com sucesso!")
+            st.success("Atualização feita com sucesso!")
             st.experimental_rerun()
         if st.button("Cancelar Edição"):
             del st.session_state["edit_index"]
+
 
 # --- Aba 2: Cadastro de Produtos ---
 with tab2:
@@ -75,21 +80,28 @@ with tab2:
     with st.form("form_produto"):
         nome_produto = st.text_input("Nome do Produto")
         insumo_sel = st.selectbox("Escolher Insumo", st.session_state.insumos["Nome"])
+        cor_opcoes = st.session_state.insumos["Cor"].unique()
+        cor_sel = st.selectbox("Selecionar Cor", cor_opcoes)  # <- Cor obrigatória
         qtd_insumo = st.number_input("Quantidade do Insumo", min_value=0.1, step=0.1)
         submitted_prod = st.form_submit_button("Adicionar ao Produto")
         if submitted_prod:
-            st.session_state.produtos.loc[len(st.session_state.produtos)] = [nome_produto, insumo_sel, qtd_insumo]
-            st.success("Componente adicionado ao produto!")
+            if not cor_sel:
+                st.error("Por favor, selecione uma cor.")
+            else:
+                st.session_state.produtos.loc[len(st.session_state.produtos)] = [nome_produto, insumo_sel, qtd_insumo, cor_sel]
+                st.success("Componente adicionado ao produto!")
 
     st.write("### Produtos cadastrados")
     for i, row in st.session_state.produtos.iterrows():
         col1, col2 = st.columns([10, 1])
         with col1:
-            st.markdown(f"**{row['Produto']}** → {row['Quantidade']}x {row['Insumo']}")
+            st.markdown(f"**{row['Produto']}** → {row['Quantidade']}x {row['Insumo']} ({row['Cor']})")
         with col2:
             if st.button("❌", key=f"del_prod_{i}"):
                 st.session_state.produtos.drop(index=i, inplace=True)
                 st.session_state.produtos.reset_index(drop=True, inplace=True)
+                st.experimental_rerun()
+
                 st.experimental_rerun()
 
 # --- Aba 3: Montagem de Orçamento ---
