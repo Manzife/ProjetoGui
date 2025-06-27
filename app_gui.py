@@ -29,7 +29,8 @@ if "produtos" not in st.session_state:
     st.session_state.produtos = pd.DataFrame(columns=["Produto", "Insumo", "Quantidade", "Cor"])
 
 # Tabs
-tab1, tab2, tab3 = st.tabs(["\ud83d\udce6 Cadastro de Insumos", "💪 Cadastro de Produtos", "💰 Montagem de Orçamento"])
+tab1, tab2, tab3 = st.tabs(["📦 Cadastro de Insumos", "💪 Cadastro de Produtos", "💰 Montagem de Orçamento"])
+
 
 # --- Aba 1: Cadastro de Insumos ---
 with tab1:
