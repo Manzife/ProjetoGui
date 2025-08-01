@@ -67,14 +67,17 @@ with tab1:
             del st.session_state["edit_index"]
 
 # --- Aba 2: Cadastro de Produtos ---
+# --- Aba 2: Cadastro de Produtos (versão avançada) ---
 with tab2:
     st.header("Cadastro de Produtos")
-    st.subheader("🪚 Armário Padrão (sem tampa)")
+    st.subheader("🪚 Armário Personalizado")
 
+    # --- Dimensões do armário ---
     altura = st.slider("Altura (cm)", 30, 250, 180) / 100
     largura = st.slider("Largura (cm)", 30, 250, 100) / 100
     profundidade = st.slider("Profundidade (cm)", 30, 100, 60) / 100
 
+    # --- Escolha das cores ---
     cores_disponiveis = {
         "Branco": "#F0F0F0",
         "Preto": "#111111",
@@ -88,32 +91,59 @@ with tab2:
     cor_dir = st.selectbox("Cor da Lateral Direita", list(cores_disponiveis.keys()), index=3)
     cor_fundo = st.selectbox("Cor do Fundo", list(cores_disponiveis.keys()), index=3)
 
-    # --- Função para criar faces corretas ---
+    # --- Faces e espessura ---
+    faces_opcoes = ["Fundo", "Lateral Esquerda", "Lateral Direita", "Traseira", "Frente"]
+    faces_selecionadas = st.multiselect(
+        "Selecione as faces para montar",
+        faces_opcoes,
+        default=faces_opcoes
+    )
+
+    espessuras = {}
+    for face in faces_selecionadas:
+        espessuras[face] = st.number_input(
+            f"Espessura da {face} (m)",
+            min_value=0.01,
+            max_value=0.1,
+            value=0.02,
+            step=0.01
+        )
+
+    # --- Função para criar faces ---
     def face_mesh(x_range, y_range, z_range, color_hex):
         x = [x_range[0], x_range[1], x_range[1], x_range[0], x_range[0], x_range[1], x_range[1], x_range[0]]
         y = [y_range[0], y_range[0], y_range[1], y_range[1], y_range[0], y_range[0], y_range[1], y_range[1]]
         z = [z_range[0], z_range[0], z_range[0], z_range[0], z_range[1], z_range[1], z_range[1], z_range[1]]
-        return go.Mesh3d(
-            x=x, y=y, z=z,
-            color=color_hex,
-            opacity=1.0,
-            flatshading=True
-        )
-    
-    # --- Faces do armário (sem tampa) ---
-    faces = [
-        # Fundo
-        face_mesh([0, largura], [0, profundidade], [0, 0.02], cores_disponiveis[cor_fundo]),
-        # Lateral Esquerda
-        face_mesh([0, 0.02], [0, profundidade], [0, altura], cores_disponiveis[cor_esq]),
-        # Lateral Direita
-        face_mesh([largura-0.02, largura], [0, profundidade], [0, altura], cores_disponiveis[cor_dir]),
-        # Traseira
-        face_mesh([0, largura], [profundidade-0.02, profundidade], [0, altura], cores_disponiveis[cor_tras]),
-        # Frente (borda)
-        face_mesh([0, largura], [0, 0.02], [0, altura], cores_disponiveis[cor_frente])
-    ]
-    
+        return go.Mesh3d(x=x, y=y, z=z, color=color_hex, opacity=1.0, flatshading=True)
+
+    # --- Criação das faces selecionadas ---
+    faces = []
+    area_por_espessura = {}
+
+    for face in faces_selecionadas:
+        esp = espessuras[face]
+
+        if face == "Fundo":
+            faces.append(face_mesh([0, largura], [0, profundidade], [0, esp], cores_disponiveis[cor_fundo]))
+            area_por_espessura[esp] = area_por_espessura.get(esp, 0) + (largura * profundidade)
+
+        elif face == "Lateral Esquerda":
+            faces.append(face_mesh([0, esp], [0, profundidade], [0, altura], cores_disponiveis[cor_esq]))
+            area_por_espessura[esp] = area_por_espessura.get(esp, 0) + (altura * profundidade)
+
+        elif face == "Lateral Direita":
+            faces.append(face_mesh([largura-esp, largura], [0, profundidade], [0, altura], cores_disponiveis[cor_dir]))
+            area_por_espessura[esp] = area_por_espessura.get(esp, 0) + (altura * profundidade)
+
+        elif face == "Traseira":
+            faces.append(face_mesh([0, largura], [profundidade-esp, profundidade], [0, altura], cores_disponiveis[cor_tras]))
+            area_por_espessura[esp] = area_por_espessura.get(esp, 0) + (largura * altura)
+
+        elif face == "Frente":
+            faces.append(face_mesh([0, largura], [0, esp], [0, altura], cores_disponiveis[cor_frente]))
+            area_por_espessura[esp] = area_por_espessura.get(esp, 0) + (largura * altura)
+
+    # --- Visualização 3D ---
     fig = go.Figure(data=faces)
     fig.update_layout(
         scene=dict(
@@ -124,21 +154,47 @@ with tab2:
         ),
         margin=dict(l=0, r=0, t=0, b=0)
     )
-    
     st.plotly_chart(fig, use_container_width=True)
-    area_total = 2 * (altura * profundidade) + 2 * (altura * largura) + (largura * profundidade)
-    st.write(f"🔨 Área total estimada de chapa de madeira: **{area_total:.2f} m²**")
 
-    cor_predominante = cor_frente
-    if st.button("Adicionar Armário com essas características"):
-        existe_insumo = st.session_state.insumos[
-            (st.session_state.insumos["Nome"] == "Chapa de Madeira") &
-            (st.session_state.insumos["Cor"] == cor_predominante)
+    # --- Consumo de madeira por espessura ---
+    df_madeira = pd.DataFrame([
+        {"Espessura (m)": esp, 
+         "Área Total (m²)": area, 
+         "Chapas 2.2x1.6m": area / (2.2*1.6)}
+        for esp, area in area_por_espessura.items()
+    ])
+    st.write("### Consumo de Madeira por Espessura")
+    st.dataframe(df_madeira)
+
+    # --- Itens extras ---
+    if "extras" not in st.session_state:
+        st.session_state.extras = pd.DataFrame(columns=["Item", "Quantidade", "Preço Unitário"])
+
+    st.subheader("Outros Itens")
+    with st.form("form_extra"):
+        item = st.text_input("Nome do Item")
+        qtd = st.number_input("Quantidade", min_value=1, step=1)
+        preco_unit = st.number_input("Preço Unitário (R$)", min_value=0.0, step=0.1)
+        add_extra = st.form_submit_button("Adicionar Item")
+        if add_extra and item:
+            st.session_state.extras.loc[len(st.session_state.extras)] = [item, qtd, preco_unit]
+
+    st.write("Itens extras cadastrados:")
+    st.dataframe(st.session_state.extras)
+
+    # --- Salvar produto com imagem ---
+    import plotly.io as pio
+    import os
+
+    if st.button("Salvar Produto com Imagem"):
+        img_path = f"produto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        pio.write_image(fig, img_path, width=800, height=600)
+
+        # Cadastro do produto
+        cor_predominante = cor_frente
+        st.session_state.produtos.loc[len(st.session_state.produtos)] = [
+            "Armário Personalizado", "Chapa de Madeira", sum(area_por_espessura.values()), cor_predominante
         ]
-        if not existe_insumo.empty:
-            st.session_state.produtos.loc[len(st.session_state.produtos)] = [
-                "Armário", "Chapa de Madeira", area_total, cor_predominante
-            ]
-            st.success("Armário adicionado com sucesso ao orçamento!")
-        else:
-            st.warning("Não foi encontrado o insumo 'Chapa de Madeira' com essa cor. Cadastre antes de adicionar.")
+
+        st.success(f"Produto salvo com imagem em {img_path}")
+        st.image(img_path, caption="Pré-visualização do produto")
