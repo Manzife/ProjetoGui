@@ -50,6 +50,7 @@ with tab1:
 # ==========================================================
 # Aba 2: Montagem de Produtos
 # ==========================================================
+# --- Aba 2: Montagem de Produtos (chapas 3D reais) ---
 with tab2:
     st.header("Montagem de Móveis")
     st.subheader("📐 Caixa Retangular")
@@ -61,14 +62,20 @@ with tab2:
 
     st.write(f"Dimensões: {largura:.2f} x {profundidade:.2f} x {altura:.2f} m")
 
-    # Escolha da chapa para cada face
-    faces_opcoes = ["Fundo", "Lateral Esquerda", "Lateral Direita", "Topo", "Base", "Frente", "Traseira"]
-    faces_selecionadas = st.multiselect("Faces que o móvel terá", faces_opcoes, default=["Base","Lateral Esquerda","Lateral Direita","Traseira","Topo"])
+    # Escolha das faces
+    faces_opcoes = ["Base", "Topo", "Lateral Esquerda", "Lateral Direita", "Frente", "Traseira"]
+    faces_selecionadas = st.multiselect(
+        "Faces que o móvel terá",
+        faces_opcoes,
+        default=["Base", "Lateral Esquerda", "Lateral Direita", "Traseira", "Topo"]
+    )
 
+    # Verifica se há chapas cadastradas
     chapas_cadastradas = st.session_state.chapas
     if chapas_cadastradas.empty:
         st.warning("⚠️ Cadastre chapas na Aba 1 antes de montar produtos.")
     else:
+        # Escolha de chapa para cada face
         chapa_por_face = {}
         for face in faces_selecionadas:
             chapa_por_face[face] = st.selectbox(
@@ -77,83 +84,82 @@ with tab2:
                 format_func=lambda i: f"{chapas_cadastradas.loc[i,'Cor']} - {chapas_cadastradas.loc[i,'Espessura (m)']}m"
             )
 
-        # Cálculo de consumo de chapas
+        # --- Função para criar chapa 3D ---
+        def create_chapa(x, y, z, dx, dy, dz, color_hex):
+            X = [x, x+dx, x+dx, x, x, x+dx, x+dx, x]
+            Y = [y, y, y+dy, y+dy, y, y, y+dy, y+dy]
+            Z = [z, z, z, z, z+dz, z+dz, z+dz, z+dz]
+            I = [0,0,0,1,1,2,3,4,4,4,5,5]
+            J = [1,2,4,2,5,3,0,5,6,7,6,1]
+            K = [2,3,5,5,6,0,4,6,7,6,2,2]
+            return go.Mesh3d(x=X, y=Y, z=Z, i=I, j=J, k=K, color=color_hex, opacity=1.0)
+
+        # --- Criação das chapas e cálculo de consumo ---
+        faces = []
         consumo = []
-        faces_areas = {
-            "Fundo": largura * profundidade,
-            "Topo": largura * profundidade,
-            "Base": largura * profundidade,
-            "Lateral Esquerda": altura * profundidade,
-            "Lateral Direita": altura * profundidade,
-            "Frente": altura * largura,
-            "Traseira": altura * largura
-        }
+        color_map = {"Madeira": "#a0522d", "Branco": "#F0F0F0", "Preto": "#111111", "Cinza": "#888888"}
 
         for face in faces_selecionadas:
             idx = chapa_por_face[face]
             chapa = chapas_cadastradas.loc[idx]
-            area_face = faces_areas[face]
-            area_chapa = chapa["Largura (m)"] * chapa["Altura (m)"]
-            qtd_chapas = math.ceil(area_face / area_chapa)
+            esp = float(chapa["Espessura (m)"])
+            area_chapa = float(chapa["Largura (m)"]) * float(chapa["Altura (m)"])
+            color_hex = color_map.get(chapa["Cor"], "#a0522d")
 
+            # Dimensões da face
+            if face in ["Base", "Topo"]:
+                dx, dy, dz = largura, profundidade, esp
+            elif face in ["Frente", "Traseira"]:
+                dx, dy, dz = largura, esp, altura
+            elif face in ["Lateral Esquerda", "Lateral Direita"]:
+                dx, dy, dz = esp, profundidade, altura
+
+            # Posição da face
+            if face == "Base":
+                x, y, z = 0, 0, 0
+            elif face == "Topo":
+                x, y, z = 0, 0, altura-esp
+            elif face == "Frente":
+                x, y, z = 0, profundidade-esp, 0
+            elif face == "Traseira":
+                x, y, z = 0, 0, 0
+            elif face == "Lateral Esquerda":
+                x, y, z = 0, 0, 0
+            elif face == "Lateral Direita":
+                x, y, z = largura-esp, 0, 0
+
+            # Adiciona face ao 3D
+            faces.append(create_chapa(x, y, z, dx, dy, dz, color_hex))
+
+            # Consumo e custo
+            area_face = dx * dy
+            qtd_chapas = math.ceil(area_face / area_chapa)
             consumo.append({
                 "Face": face,
                 "Cor": chapa["Cor"],
-                "Espessura (m)": chapa["Espessura (m)"],
-                "Área da Face (m²)": area_face,
-                "Área Chapa (m²)": area_chapa,
+                "Espessura (m)": esp,
+                "Área da Face (m²)": round(area_face, 3),
                 "Qtd Chapas": qtd_chapas,
                 "Custo Total (R$)": qtd_chapas * chapa["Preço (R$)"]
             })
 
-        df_consumo = pd.DataFrame(consumo)
-        st.write("### Consumo de Chapas")
-        st.dataframe(df_consumo)
-
-        # Visualização 3D simplificada (como blocos)
-        def face_mesh(x_range, y_range, z_range, color_hex):
-            x = [x_range[0], x_range[1], x_range[1], x_range[0], x_range[0], x_range[1], x_range[1], x_range[0]]
-            y = [y_range[0], y_range[0], y_range[1], y_range[1], y_range[0], y_range[0], y_range[1], y_range[1]]
-            z = [z_range[0], z_range[0], z_range[0], z_range[0], z_range[1], z_range[1], z_range[1], z_range[1]]
-            return go.Mesh3d(x=x, y=y, z=z, color=color_hex, opacity=1.0, flatshading=True)
-
-        faces = []
-        for face in faces_selecionadas:
-            cor = chapas_cadastradas.loc[chapa_por_face[face], "Cor"]
-            color_map = {
-                "Madeira": "#a0522d",
-                "Branco": "#F0F0F0",
-                "Preto": "#111111",
-                "Cinza": "#888888"
-            }
-            color_hex = color_map.get(cor, "#a0522d")
-
-            if face == "Base":
-                faces.append(face_mesh([0, largura], [0, profundidade], [0, 0.02], color_hex))
-            elif face == "Topo":
-                faces.append(face_mesh([0, largura], [0, profundidade], [altura-0.02, altura], color_hex))
-            elif face == "Fundo":
-                faces.append(face_mesh([0, largura], [0, 0.02], [0, altura], color_hex))
-            elif face == "Lateral Esquerda":
-                faces.append(face_mesh([0, 0.02], [0, profundidade], [0, altura], color_hex))
-            elif face == "Lateral Direita":
-                faces.append(face_mesh([largura-0.02, largura], [0, profundidade], [0, altura], color_hex))
-            elif face == "Frente":
-                faces.append(face_mesh([0, largura], [profundidade-0.02, profundidade], [0, altura], color_hex))
-            elif face == "Traseira":
-                faces.append(face_mesh([0, largura], [0, 0.02], [0, altura], color_hex))
-
+        # --- Visualização 3D do móvel ---
         fig = go.Figure(data=faces)
         fig.update_layout(scene=dict(aspectmode="data"), margin=dict(l=0,r=0,t=0,b=0))
         st.plotly_chart(fig, use_container_width=True)
 
-        # Salvar produto
+        # --- Tabela de Consumo ---
+        df_consumo = pd.DataFrame(consumo)
+        st.write("### Consumo de Chapas")
+        st.dataframe(df_consumo)
+
+        # --- Salvar Produto com Imagem ---
         if st.button("Salvar Produto com Imagem"):
             img_path = f"produto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             pio.write_image(fig, img_path, width=800, height=600)
 
             st.session_state.produtos.loc[len(st.session_state.produtos)] = [
-                "Móvel Personalizado",
+                "Móvel 3D Real",
                 df_consumo["Área da Face (m²)"].sum(),
                 df_consumo.to_dict(),
                 img_path
