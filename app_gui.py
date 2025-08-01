@@ -88,31 +88,44 @@ with tab2:
     cor_dir = st.selectbox("Cor da Lateral Direita", list(cores_disponiveis.keys()), index=3)
     cor_fundo = st.selectbox("Cor do Fundo", list(cores_disponiveis.keys()), index=3)
 
-    def face_mesh(x_range, y_range, z_range, color_hex):
-        x = [x_range[0], x_range[1], x_range[1], x_range[0], x_range[0], x_range[1], x_range[1], x_range[0]]
-        y = [y_range[0], y_range[0], y_range[1], y_range[1], y_range[0], y_range[0], y_range[1], y_range[1]]
-        z = [z_range[0], z_range[0], z_range[0], z_range[0], z_range[1], z_range[1], z_range[1], z_range[1]]
-        return go.Mesh3d(x=x, y=y, z=z, color=color_hex, opacity=1.0, alphahull=0)
-
-    faces = [
-        face_mesh([0, largura], [0, 0.02], [0, altura], cores_disponiveis[cor_esq]),
-        face_mesh([largura-0.02, largura], [0, profundidade], [0, altura], cores_disponiveis[cor_dir]),
-        face_mesh([0, largura], [0, profundidade], [0, 0.02], cores_disponiveis[cor_fundo]),
-        face_mesh([0, largura], [profundidade-0.02, profundidade], [0, altura], cores_disponiveis[cor_tras]),
-        face_mesh([0, largura], [0, 0.02], [0, altura], cores_disponiveis[cor_frente])
-    ]
-
-    fig = go.Figure(data=faces)
-    fig.update_layout(
-        scene=dict(
-            xaxis_title="Largura (m)",
-            yaxis_title="Profundidade (m)",
-            zaxis_title="Altura (m)"
-        ),
-        margin=dict(l=0, r=0, t=0, b=0)
+# --- Função para criar faces corretas ---
+def face_mesh(x_range, y_range, z_range, color_hex):
+    x = [x_range[0], x_range[1], x_range[1], x_range[0], x_range[0], x_range[1], x_range[1], x_range[0]]
+    y = [y_range[0], y_range[0], y_range[1], y_range[1], y_range[0], y_range[0], y_range[1], y_range[1]]
+    z = [z_range[0], z_range[0], z_range[0], z_range[0], z_range[1], z_range[1], z_range[1], z_range[1]]
+    return go.Mesh3d(
+        x=x, y=y, z=z,
+        color=color_hex,
+        opacity=1.0,
+        flatshading=True
     )
-    st.plotly_chart(fig, use_container_width=True)
 
+# --- Faces do armário (sem tampa) ---
+faces = [
+    # Fundo
+    face_mesh([0, largura], [0, profundidade], [0, 0.02], cores_disponiveis[cor_fundo]),
+    # Lateral Esquerda
+    face_mesh([0, 0.02], [0, profundidade], [0, altura], cores_disponiveis[cor_esq]),
+    # Lateral Direita
+    face_mesh([largura-0.02, largura], [0, profundidade], [0, altura], cores_disponiveis[cor_dir]),
+    # Traseira
+    face_mesh([0, largura], [profundidade-0.02, profundidade], [0, altura], cores_disponiveis[cor_tras]),
+    # Frente (borda)
+    face_mesh([0, largura], [0, 0.02], [0, altura], cores_disponiveis[cor_frente])
+]
+
+fig = go.Figure(data=faces)
+fig.update_layout(
+    scene=dict(
+        xaxis_title="Largura (m)",
+        yaxis_title="Profundidade (m)",
+        zaxis_title="Altura (m)",
+        aspectmode="data"
+    ),
+    margin=dict(l=0, r=0, t=0, b=0)
+)
+
+st.plotly_chart(fig, use_container_width=True)
     area_total = 2 * (altura * profundidade) + 2 * (altura * largura) + (largura * profundidade)
     st.write(f"🔨 Área total estimada de chapa de madeira: **{area_total:.2f} m²**")
 
