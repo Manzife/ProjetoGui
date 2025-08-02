@@ -50,29 +50,53 @@ if st.session_state.chapas.empty:
 tab1, tab2, tab3 = st.tabs(["📦 Cadastro de Chapas", "💪 Montagem de Produtos", "💰 Orçamento Final"])
 
 # ==========================================================
-# Aba 1: Cadastro de Chapas
+# Aba 1: Cadastro de Chapas com Espessuras e Retalhos
 # ==========================================================
 with tab1:
     st.header("Cadastro de Chapas de Madeira")
 
+    espessuras_padrao = [0.006, 0.015, 0.018, 0.025]  # 6mm, 15mm, 18mm, 25mm
+    labels_padrao = [f"{int(e*1000)} mm" for e in espessuras_padrao]
+
     with st.form("form_chapa"):
-        cor = st.text_input("Cor da Chapa", value="Madeira")
-        espessura = st.number_input("Espessura (m)", min_value=0.01, max_value=0.1, step=0.01, value=0.02)
+        cor = st.text_input("Cor da Chapa", value="Branco")
+
+        # --- Espessura com opção personalizada ---
+        escolha_esp = st.selectbox("Espessura da Chapa", labels_padrao + ["Outra..."], index=1)
+        if escolha_esp == "Outra...":
+            espessura = st.number_input("Informe nova espessura (em metros)", min_value=0.001, max_value=0.1, step=0.001)
+        else:
+            idx = labels_padrao.index(escolha_esp)
+            espessura = espessuras_padrao[idx]
+
         largura = st.number_input("Largura da Chapa (m)", min_value=0.5, max_value=3.0, step=0.1, value=1.6)
         altura = st.number_input("Altura da Chapa (m)", min_value=0.5, max_value=3.0, step=0.1, value=2.2)
-        preco = st.number_input("Preço da Chapa (R$)", min_value=0.0, step=1.0, value=180.0)
+        preco = st.number_input("Preço da Chapa (R$)", min_value=0.0, step=1.0, value=200.0)
+
+        # --- Novo seletor para uso de retalhos ---
+        usa_ret = st.selectbox("Usa Retalhos?", ["Sim", "Não"], index=0)
+
         submitted = st.form_submit_button("Adicionar Chapa")
         if submitted:
-            nova_chapa = {"Cor": cor, "Espessura (m)": espessura, "Largura (m)": largura, "Altura (m)": altura, "Preço (R$)": preco}
+            nova_chapa = {
+                "Cor": cor,
+                "Espessura (m)": espessura,
+                "Largura (m)": largura,
+                "Altura (m)": altura,
+                "Preço (R$)": preco,
+                "Usa Retalhos": True if usa_ret == "Sim" else False
+            }
             st.session_state.chapas.loc[len(st.session_state.chapas)] = nova_chapa
             st.success("Chapa adicionada com sucesso!")
 
+    # --- Visualizar insumos cadastrados ---
     st.write("### Chapas cadastradas")
-    st.dataframe(st.session_state.chapas)
+    if not st.session_state.chapas.empty:
+        df_exibir = st.session_state.chapas.copy()
+        df_exibir["Espessura"] = (df_exibir["Espessura (m)"]*1000).round(0).astype(int).astype(str) + " mm"
+        df_exibir["Usa Retalhos"] = df_exibir["Usa Retalhos"].apply(lambda x: "Sim" if x else "Não")
+        st.dataframe(df_exibir[["Cor","Espessura","Largura (m)","Altura (m)","Preço (R$)","Usa Retalhos"]])
 
-# ==========================================================
-# Aba 2: Montagem de Produtos
-# ==========================================================
 # ==========================================================
 # Aba 2: Montagem de Produtos com Retalhos
 # ==========================================================
