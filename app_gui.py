@@ -175,6 +175,12 @@ with tab2:
 # ==========================================================
 with tab3:
     st.header("Orçamento Final")
+
+    # Garante que a chave existe
+    if "produtos" not in st.session_state:
+        st.session_state.produtos = pd.DataFrame(columns=["Produto", "Área Total (m²)", "Chapas Usadas", "Imagem"])
+
+    # Exibe produtos
     if not st.session_state.produtos.empty:
         st.write("Produtos já salvos:")
         st.dataframe(st.session_state.produtos[["Produto","Área Total (m²)","Imagem"]])
