@@ -10,16 +10,24 @@ st.set_page_config(page_title="Orçamento Marcenaria", layout="centered")
 st.title("🌳 Sistema de Orçamento para Marcenaria")
 
 # ==========================================================
-# Inicialização de Estados
+# Inicialização de Estados e Insumos Padrão
 # ==========================================================
 if "chapas" not in st.session_state:
     st.session_state.chapas = pd.DataFrame(columns=["Cor", "Espessura (m)", "Largura (m)", "Altura (m)", "Preço (R$)"])
 
-if "produtos" not in st.session_state:
-    st.session_state.produtos = pd.DataFrame(columns=["Produto", "Área Total (m²)", "Chapas Usadas", "Imagem"])
-
-if "extras" not in st.session_state:
-    st.session_state.extras = pd.DataFrame(columns=["Item", "Quantidade", "Preço Unitário (R$)"])
+# Adiciona insumos padrão se ainda não existir
+if st.session_state.chapas.empty:
+    espessuras_padrao = [0.006, 0.015, 0.018, 0.025]  # 6mm, 15mm, 18mm, 25mm
+    cores_padrao = ["Branco", "Colorida"]
+    for cor in cores_padrao:
+        for esp in espessuras_padrao:
+            st.session_state.chapas.loc[len(st.session_state.chapas)] = {
+                "Cor": cor,
+                "Espessura (m)": esp,
+                "Largura (m)": 1.6,
+                "Altura (m)": 2.2,
+                "Preço (R$)": 200.0 if cor == "Branco" else 250.0
+            }
 
 # ==========================================================
 # Tabs
@@ -50,7 +58,6 @@ with tab1:
 # ==========================================================
 # Aba 2: Montagem de Produtos
 # ==========================================================
-# --- Aba 2: Montagem de Produtos (chapas 3D reais) ---
 with tab2:
     st.header("Montagem de Móveis")
     st.subheader("📐 Caixa Retangular")
@@ -70,6 +77,9 @@ with tab2:
         default=["Base", "Lateral Esquerda", "Lateral Direita", "Traseira", "Topo"]
     )
 
+    # Escolher se quer ou não visualizar 3D
+    ver_3d = st.checkbox("Visualizar móvel em 3D", value=True)
+
     # Verifica se há chapas cadastradas
     chapas_cadastradas = st.session_state.chapas
     if chapas_cadastradas.empty:
@@ -81,7 +91,7 @@ with tab2:
             chapa_por_face[face] = st.selectbox(
                 f"Chapa para {face}",
                 options=chapas_cadastradas.index,
-                format_func=lambda i: f"{chapas_cadastradas.loc[i,'Cor']} - {chapas_cadastradas.loc[i,'Espessura (m)']}m"
+                format_func=lambda i: f"{chapas_cadastradas.loc[i,'Cor']} - {chapas_cadastradas.loc[i,'Espessura (m)']*1000:.0f}mm"
             )
 
         # --- Função para criar chapa 3D ---
@@ -97,7 +107,7 @@ with tab2:
         # --- Criação das chapas e cálculo de consumo ---
         faces = []
         consumo = []
-        color_map = {"Madeira": "#a0522d", "Branco": "#F0F0F0", "Preto": "#111111", "Cinza": "#888888"}
+        color_map = {"Madeira": "#a0522d", "Branco": "#F0F0F0", "Preto": "#111111", "Cinza": "#888888", "Colorida": "#ff6f61"}
 
         for face in faces_selecionadas:
             idx = chapa_por_face[face]
@@ -106,7 +116,7 @@ with tab2:
             area_chapa = float(chapa["Largura (m)"]) * float(chapa["Altura (m)"])
             color_hex = color_map.get(chapa["Cor"], "#a0522d")
 
-            # Dimensões da face
+            # Dimensões e posições
             if face in ["Base", "Topo"]:
                 dx, dy, dz = largura, profundidade, esp
             elif face in ["Frente", "Traseira"]:
@@ -114,7 +124,6 @@ with tab2:
             elif face in ["Lateral Esquerda", "Lateral Direita"]:
                 dx, dy, dz = esp, profundidade, altura
 
-            # Posição da face
             if face == "Base":
                 x, y, z = 0, 0, 0
             elif face == "Topo":
@@ -128,10 +137,11 @@ with tab2:
             elif face == "Lateral Direita":
                 x, y, z = largura-esp, 0, 0
 
-            # Adiciona face ao 3D
-            faces.append(create_chapa(x, y, z, dx, dy, dz, color_hex))
+            # Cria face 3D se opção ativada
+            if ver_3d:
+                faces.append(create_chapa(x, y, z, dx, dy, dz, color_hex))
 
-            # Consumo e custo
+            # Consumo
             area_face = dx * dy
             qtd_chapas = math.ceil(area_face / area_chapa)
             consumo.append({
@@ -143,30 +153,17 @@ with tab2:
                 "Custo Total (R$)": qtd_chapas * chapa["Preço (R$)"]
             })
 
-        # --- Visualização 3D do móvel ---
-        fig = go.Figure(data=faces)
-        fig.update_layout(scene=dict(aspectmode="data"), margin=dict(l=0,r=0,t=0,b=0))
-        st.plotly_chart(fig, use_container_width=True)
+        # --- Visualização 3D opcional ---
+        if ver_3d:
+            fig = go.Figure(data=faces)
+            fig.update_layout(scene=dict(aspectmode="data"), margin=dict(l=0,r=0,t=0,b=0))
+            st.plotly_chart(fig, use_container_width=True)
 
         # --- Tabela de Consumo ---
         df_consumo = pd.DataFrame(consumo)
         st.write("### Consumo de Chapas")
         st.dataframe(df_consumo)
-
-        # --- Salvar Produto com Imagem ---
-        if st.button("Salvar Produto com Imagem"):
-            img_path = f"produto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-            pio.write_image(fig, img_path, width=800, height=600)
-
-            st.session_state.produtos.loc[len(st.session_state.produtos)] = [
-                "Móvel 3D Real",
-                df_consumo["Área da Face (m²)"].sum(),
-                df_consumo.to_dict(),
-                img_path
-            ]
-            st.success("Produto salvo com sucesso!")
-            st.image(img_path)
-
+        
 # ==========================================================
 # Aba 3: Orçamento Final
 # ==========================================================
