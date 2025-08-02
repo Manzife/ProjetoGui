@@ -15,7 +15,13 @@ st.title("🌳 Sistema de Orçamento para Marcenaria")
 if "chapas" not in st.session_state:
     st.session_state.chapas = pd.DataFrame(columns=["Cor", "Espessura (m)", "Largura (m)", "Altura (m)", "Preço (R$)"])
 
-# Adiciona insumos padrão se ainda não existir
+if "produtos" not in st.session_state:
+    st.session_state.produtos = pd.DataFrame(columns=["Produto", "Área Total (m²)", "Chapas Usadas", "Imagem"])
+
+if "extras" not in st.session_state:
+    st.session_state.extras = pd.DataFrame(columns=["Item", "Quantidade", "Preço Unitário (R$)"])
+
+# Adiciona insumos padrão se não houver chapas
 if st.session_state.chapas.empty:
     espessuras_padrao = [0.006, 0.015, 0.018, 0.025]  # 6mm, 15mm, 18mm, 25mm
     cores_padrao = ["Branco", "Colorida"]
@@ -174,3 +180,4 @@ with tab3:
         st.dataframe(st.session_state.produtos[["Produto","Área Total (m²)","Imagem"]])
     else:
         st.info("Nenhum produto salvo ainda.")
+
