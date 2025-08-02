@@ -12,8 +12,13 @@ st.title("🌳 Sistema de Orçamento para Marcenaria")
 # ==========================================================
 # Inicialização de Estados e Insumos Padrão
 # ==========================================================
+# -------------------------
+# Inicialização de Estados
+# -------------------------
 if "chapas" not in st.session_state:
-    st.session_state.chapas = pd.DataFrame(columns=["Cor", "Espessura (m)", "Largura (m)", "Altura (m)", "Preço (R$)"])
+    st.session_state.chapas = pd.DataFrame(columns=[
+        "Cor", "Espessura (m)", "Largura (m)", "Altura (m)", "Preço (R$)", "Usa Retalhos"
+    ])
 
 if "produtos" not in st.session_state:
     st.session_state.produtos = pd.DataFrame(columns=["Produto", "Área Total (m²)", "Chapas Usadas", "Imagem"])
@@ -24,17 +29,21 @@ if "extras" not in st.session_state:
 # Adiciona insumos padrão se não houver chapas
 if st.session_state.chapas.empty:
     espessuras_padrao = [0.006, 0.015, 0.018, 0.025]  # 6mm, 15mm, 18mm, 25mm
-    cores_padrao = ["Branco", "Colorida"]
-    for cor in cores_padrao:
+    cores_padrao = [
+        {"cor": "Branco", "usa_ret": True, "preco": 200.0},
+        {"cor": "Colorida", "usa_ret": False, "preco": 250.0}
+    ]
+
+    for cor_info in cores_padrao:
         for esp in espessuras_padrao:
             st.session_state.chapas.loc[len(st.session_state.chapas)] = {
-                "Cor": cor,
+                "Cor": cor_info["cor"],
                 "Espessura (m)": esp,
                 "Largura (m)": 1.6,
                 "Altura (m)": 2.2,
-                "Preço (R$)": 200.0 if cor == "Branco" else 250.0
+                "Preço (R$)": cor_info["preco"],
+                "Usa Retalhos": cor_info["usa_ret"]
             }
-
 # ==========================================================
 # Tabs
 # ==========================================================
@@ -64,6 +73,9 @@ with tab1:
 # ==========================================================
 # Aba 2: Montagem de Produtos
 # ==========================================================
+# ==========================================================
+# Aba 2: Montagem de Produtos com Retalhos
+# ==========================================================
 with tab2:
     st.header("Montagem de Móveis")
     st.subheader("📐 Caixa Retangular")
@@ -83,7 +95,7 @@ with tab2:
         default=["Base", "Lateral Esquerda", "Lateral Direita", "Traseira", "Topo"]
     )
 
-    # Escolher se quer ou não visualizar 3D
+    # Escolher se quer visualizar em 3D
     ver_3d = st.checkbox("Visualizar móvel em 3D", value=True)
 
     # Verifica se há chapas cadastradas
@@ -97,7 +109,11 @@ with tab2:
             chapa_por_face[face] = st.selectbox(
                 f"Chapa para {face}",
                 options=chapas_cadastradas.index,
-                format_func=lambda i: f"{chapas_cadastradas.loc[i,'Cor']} - {chapas_cadastradas.loc[i,'Espessura (m)']*1000:.0f}mm"
+                format_func=lambda i: (
+                    f"{chapas_cadastradas.loc[i,'Cor']} "
+                    f"- {chapas_cadastradas.loc[i,'Espessura (m)']*1000:.0f}mm "
+                    f"- Retalhos: {'Sim' if chapas_cadastradas.loc[i,'Usa Retalhos'] else 'Não'}"
+                )
             )
 
         # --- Função para criar chapa 3D ---
@@ -113,16 +129,20 @@ with tab2:
         # --- Criação das chapas e cálculo de consumo ---
         faces = []
         consumo = []
-        color_map = {"Madeira": "#a0522d", "Branco": "#F0F0F0", "Preto": "#111111", "Cinza": "#888888", "Colorida": "#ff6f61"}
+        color_map = {
+            "Madeira": "#a0522d", "Branco": "#F0F0F0", "Preto": "#111111",
+            "Cinza": "#888888", "Colorida": "#ff6f61"
+        }
 
         for face in faces_selecionadas:
             idx = chapa_por_face[face]
             chapa = chapas_cadastradas.loc[idx]
             esp = float(chapa["Espessura (m)"])
             area_chapa = float(chapa["Largura (m)"]) * float(chapa["Altura (m)"])
+            usa_retalhos = bool(chapa["Usa Retalhos"])
             color_hex = color_map.get(chapa["Cor"], "#a0522d")
 
-            # Dimensões e posições
+            # Dimensões da chapa (dx,dy,dz) e posição (x,y,z)
             if face in ["Base", "Topo"]:
                 dx, dy, dz = largura, profundidade, esp
             elif face in ["Frente", "Traseira"]:
@@ -143,24 +163,36 @@ with tab2:
             elif face == "Lateral Direita":
                 x, y, z = largura-esp, 0, 0
 
-            # Cria face 3D se opção ativada
+            # Cria face 3D se opção estiver ativa
             if ver_3d:
                 faces.append(create_chapa(x, y, z, dx, dy, dz, color_hex))
 
-            # Consumo
+            # --- Cálculo de consumo com regra de retalhos ---
             area_face = dx * dy
-            qtd_chapas = math.ceil(area_face / area_chapa)
+            qtd_chapas_real = area_face / area_chapa
+
+            if usa_retalhos:
+                # Cobra só pela área efetiva
+                qtd_cobrada = round(qtd_chapas_real, 2)
+                custo_total = area_face * (chapa["Preço (R$)"] / area_chapa)
+            else:
+                # Cobra chapa inteira
+                qtd_cobrada = math.ceil(qtd_chapas_real)
+                custo_total = qtd_cobrada * chapa["Preço (R$)"]
+
             consumo.append({
                 "Face": face,
                 "Cor": chapa["Cor"],
                 "Espessura (m)": esp,
                 "Área da Face (m²)": round(area_face, 3),
-                "Qtd Chapas": qtd_chapas,
-                "Custo Total (R$)": qtd_chapas * chapa["Preço (R$)"]
+                "Qtd Chapas Real": round(qtd_chapas_real, 2),
+                "Qtd Chapas Cobrada": qtd_cobrada,
+                "Custo Total (R$)": round(custo_total, 2),
+                "Usa Retalhos": "Sim" if usa_retalhos else "Não"
             })
 
         # --- Visualização 3D opcional ---
-        if ver_3d:
+        if ver_3d and faces:
             fig = go.Figure(data=faces)
             fig.update_layout(scene=dict(aspectmode="data"), margin=dict(l=0,r=0,t=0,b=0))
             st.plotly_chart(fig, use_container_width=True)
@@ -169,6 +201,24 @@ with tab2:
         df_consumo = pd.DataFrame(consumo)
         st.write("### Consumo de Chapas")
         st.dataframe(df_consumo)
+
+        # --- Salvar Produto com Imagem ---
+        if st.button("Salvar Produto com Imagem"):
+            img_path = f"produto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            if ver_3d and faces:
+                pio.write_image(fig, img_path, width=800, height=600)
+            else:
+                img_path = None
+
+            st.session_state.produtos.loc[len(st.session_state.produtos)] = [
+                "Móvel 3D Real",
+                df_consumo["Área da Face (m²)"].sum(),
+                df_consumo.to_dict(),
+                img_path
+            ]
+            st.success("Produto salvo com sucesso!")
+            if img_path:
+                st.image(img_path)
         
 # ==========================================================
 # Aba 3: Orçamento Final
